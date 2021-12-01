@@ -10,10 +10,14 @@
 	
 	# print debugging:
 	challenger_method: .asciiz	"You've arrived to challenger!\n"
+	challenger_post_generate: .asciiz "In challenger, finished generating\n"
+	challenger_post_loop: .asciiz "In challenger, finished looping\n"
 	guesser_method: .asciiz "You've arrived to guesser!\n"
 	main_method: .asciiz "You've arrived to main!\n"
 	end_method: .asciiz "You've arrived to end!\n"
 	number_combos: .asciiz "Total number of combos: "
+	colon:	.asciiz	": "
+	newline: .asciiz "\n"
 	
 .text
 	j main
@@ -33,7 +37,15 @@
 		
 		# Print that we're in the challenger function
 		li $v0, 4
-		la $a0, challenger_method
+		la $a0, challenger_post_generate
+		syscall
+		
+		# loop through list
+		jal loop_through_list
+		
+		# Print that we're in the challenger function
+		li $v0, 4
+		la $a0, challenger_post_loop
 		syscall
 		
 		# end
@@ -53,7 +65,7 @@
 		j end
 		
 # --------------
-# TARGET METHODS
+# TARGET GENERATION
 # --------------
 
 	generate_targets:
@@ -73,17 +85,17 @@
 		jal loop_a
 		
 		# Print total number
-		li $v0, 4
-		la $a0, number_combos
-		syscall
+		#li $v0, 4
+		#la $a0, number_combos
+		#syscall
 		
-		li $v0, 1
-		move $a0, $t4
-		syscall
+		#li $v0, 1
+		#move $a0, $t4
+		#syscall
 		
-		li $v0, 11
-		li $a0, 10
-		syscall
+		#li $v0, 11
+		#li $a0, 10
+		#syscall
 		
 		# stack shenanigans 2: Electric Boogaloo
 		lw $ra, 0($sp)
@@ -198,14 +210,14 @@
 		sw $t5, ($t7)
 		
 		# right now, just print the number
-		li $v0, 1
-		move $a0, $t5
-		syscall
+		#li $v0, 1
+		#move $a0, $t5
+		#syscall
 		
 		# Print new line
-		li $v0, 11
-		li $a0, 10
-		syscall
+		#li $v0, 11
+		#li $a0, 10
+		#syscall
 		
 		# increment counter of valid numbers
 		addi $t4, $t4, 1
@@ -213,6 +225,73 @@
 		jr $ra
 		
 	quit_to_loop:
+		jr $ra
+		
+# --------------
+# TARGET PRUNING
+# --------------
+
+loop_through_list:
+	# Get address of list
+	la $t0, targets
+	li $t1, 0 			# $t1 is what index we're at, $t2 will be offset
+	
+	# stack shenanigans
+	addi $sp, $sp, -8 	# space for 1 register
+	sw $ra, 0($sp)
+		
+	jal loop_list_a
+	
+	# stack shenanigans 2: Electric Boogaloo
+	lw $ra, 0($sp)
+	addi $sp, $sp, 8
+	jr $ra
+	
+	
+loop_list_a:
+		# stack shenanigans
+		addi $sp, $sp, -8 	# space for 1 register
+		sw $ra, 0($sp)
+		
+		# get memory address - $t0 + ($t1 * 4)
+		mul $t2, $t1, 4
+		add $t3, $t2, $t0		# $t3 now has mem addr to check
+		
+		lw $t4, ($t3) # $t4 should have the value we're looking at
+		li $t5, 8367
+		beq $t4, $t5, remove_number
+		j skip_number
+		
+		remove_number:
+		sw $zero, ($t3)
+		
+		skip_number:
+		# print the number we're looking at:
+		li $v0, 1
+		move $a0, $t1
+		syscall
+		
+		li $v0, 4
+		la $a0, colon
+		syscall
+		
+		li $v0, 1
+		move $a0, $t4
+		syscall
+		
+		li $v0, 4
+		la $a0, newline
+		syscall
+		
+		# stack shenanigans 2: Electric Boogaloo
+		lw $ra, 0($sp)
+		addi $sp, $sp, 8
+		
+		# check conditional
+		addi $t1, $t1, 1		# i++
+		slti $t2, $t1, 5040		# $t2 = 1 if i < 5040
+		bne $t2, $zero, loop_list_a
+		
 		jr $ra
 		
 # ----
