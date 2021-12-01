@@ -1,6 +1,12 @@
 .data
 	role_prompt:	.asciiz "Do you accept the role of challenger [enter 1] or guesser [enter 2]?\n"
+	guess_prompt: .asciiz	"Enter your guess, boo: \n"
+	score_prompt: .asciiz "How'd I do??? "
+	
 	role: 				.word 	0 	# 1 for game master, 2 for guesser
+	guess:				.word		0		# This will be the guess
+	score:				.word		0		# This will be the score
+
 	targets:			.space	20160 # 5040 numbers * 4 bytes/number = 20160
 		
 	wrong_digits_err: .asciiz 	"Your input needs to be four digits long. Please enter another number.\n"
@@ -16,6 +22,7 @@
 	main_method: .asciiz "You've arrived to main!\n"
 	end_method: .asciiz "You've arrived to end!\n"
 	number_combos: .asciiz "Total number of combos: "
+	guess_confirmation: .asciiz "\nYou guessed: "
 	colon:	.asciiz	": "
 	newline: .asciiz "\n"
 	
@@ -61,8 +68,47 @@
 		la $a0, guesser_method
 		syscall
 		
+		jal generate_targets
+		
+		jal loop_through_list
+		
+		jal take_in_guess
+		
 		# end
 		j end
+		
+	take_in_guess:
+		# take in a 4 (or maybe sometimes 3) digit number from the user
+		# and store it in guess
+		
+		# if the user is the guesser (if role = 2)
+		# then print the prompt
+		#li $t0, 2
+		#bne $t0, role, skip # if role != 2, skip printing the prompt
+		
+		# print prompt
+		li $v0, 4
+		la $a0, guess_prompt
+		syscall
+		
+		# read integer
+		li $v0, 5
+		syscall # $v0 contains integer read
+		
+		# assign guess to $v0's contents
+		sw $v0, guess
+		move $t0, $v0
+		
+		# Print what we just guessed
+		li $v0, 4
+		la $a0, guess_confirmation
+		syscall
+		
+		li $v0, 1
+		lw $a0, guess
+		syscall
+		
+		jr $ra
 		
 # --------------
 # TARGET GENERATION
