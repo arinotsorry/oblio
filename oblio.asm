@@ -1,7 +1,8 @@
 .data
 	role_prompt:	.asciiz "Do you accept the role of challenger [enter 1] or guesser [enter 2]?\n"
 	role: 				.word 	0 	# 1 for game master, 2 for guesser
-	
+	targets:			.space	20160 # 5040 numbers * 4 bytes/number = 20160
+		
 	wrong_digits_err: .asciiz 	"Your input needs to be four digits long. Please enter another number.\n"
 	duplicates_err: 	.asciiz 	"Your number needs to consist of four unique digits. Please enter another number.\n"
 	invalid_clue_err: .asciiz 	"Bruh. Your clue isn't possible, amigo.\n"
@@ -12,6 +13,7 @@
 	guesser_method: .asciiz "You've arrived to guesser!\n"
 	main_method: .asciiz "You've arrived to main!\n"
 	end_method: .asciiz "You've arrived to end!\n"
+	number_combos: .asciiz "Total number of combos: "
 	
 .text
 	j main
@@ -71,9 +73,16 @@
 		jal loop_a
 		
 		# Print total number
-		li $t4, 500
+		li $v0, 4
+		la $a0, number_combos
+		syscall
+		
 		li $v0, 1
 		move $a0, $t4
+		syscall
+		
+		li $v0, 11
+		li $a0, 10
 		syscall
 		
 		# stack shenanigans 2: Electric Boogaloo
@@ -147,7 +156,7 @@
 		addi $sp, $sp, -8 	# space for 1 register
 		sw $ra, 0($sp)
 		
-		# call check_number
+		jal check_number
 		
 		# stack shenanigans 2: Electric Boogaloo
 		lw $ra, 0($sp)
@@ -158,6 +167,52 @@
 		slti $t6, $t3, 10		# $t6 = 1 if i < 10
 		bne $t6, $zero, loop_d
 		
+		jr $ra
+		
+	check_number:
+		beq $t0, $t1, quit_to_loop
+		beq $t0, $t2, quit_to_loop
+		beq $t0, $t3, quit_to_loop
+		beq $t1, $t2, quit_to_loop
+		beq $t1, $t3, quit_to_loop
+		beq $t2, $t3, quit_to_loop
+		j record_number
+		
+	record_number:
+		# $t4 is counter
+		# $t5 is number
+		li $t6, 10		# Babe are you a decimal number? Cause you're a base 10 ;)
+		
+		move $t5, $t0			#       a
+		mul $t5, $t5, $t6	#     a 0
+		add $t5, $t5, $t1 #     a b
+		mul $t5, $t5, $t6	#   a b 0
+		add $t5, $t5, $t2 #   a b c
+		mul $t5, $t5, $t6	# a b c 0
+		add $t5, $t5, $t3	# a b c d
+		
+		# Add to some kind of list
+		la $t7, targets		# $t7 = array address, $t3 = # of elements init'd
+		mul $t8, $t4, 4		# $t8 = offset
+		add $t7, $t7, $t8	# $t7 = address of element to fill in
+		sw $t5, ($t7)
+		
+		# right now, just print the number
+		li $v0, 1
+		move $a0, $t5
+		syscall
+		
+		# Print new line
+		li $v0, 11
+		li $a0, 10
+		syscall
+		
+		# increment counter of valid numbers
+		addi $t4, $t4, 1
+		
+		jr $ra
+		
+	quit_to_loop:
 		jr $ra
 		
 # ----
