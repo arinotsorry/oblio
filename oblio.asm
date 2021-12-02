@@ -3,12 +3,17 @@
 	guess_prompt: .asciiz	"Enter your guess, boo: \n"
 	score_prompt: .asciiz "How'd I do??? "
 	
+	score_intro: 	.asciiz "Your score is: "
+	
 	role: 				.word 	0 	# 1 for game master, 2 for guesser
 	guess:				.word		0		# This will be the guess
 	score:				.word		0		# This will be the score
 	target:				.word		0		# Program's secret number
+	guessed:			.word		0		# Becomes 1 if game ended
 
 	targets:			.space	20160 # 5040 numbers * 4 bytes/number = 20160
+	
+	you_win:	.asciiz "Congratulations you smartie pants, you win!\nWant to play again??? [enter 1]\nIf not that's okay :'( [enter 0]\n"
 		
 	wrong_digits_err: .asciiz 	"\nYour input needs to be four digits long\n"
 	duplicates_err: 	.asciiz 	"\nYour number needs to consist of four unique digits\n"
@@ -58,10 +63,11 @@
 		syscall
 		
 		# jal loop_through_list
-		
 		jal choose_target
 		
+		guessing_loop:
 		jal take_in_guess
+		jal score_user_guess
 		
 		# Print that we're in the guesser function
 		li $v0, 4
@@ -72,8 +78,14 @@
 		j end
 		
 	choose_target:
+		# read integer
+		li $v0, 5
+		syscall # $v0 contains integer read
+		
 		# choose a random number between 0 and 5039
-		li $v0, 41
+		li $v0, 42
+		li $a0, 40 # id of pseudorandom number generator (any int)
+		li $a1, 5040 # upper exclusive range of valies
 		syscall
 		
 		move $t1, $a0 		# $t1 contains random number
@@ -192,6 +204,144 @@
 		la $a0, duplicates_err
 		syscall
 		j take_in_guess
+		
+	score_user_guess:
+		
+		# dissect target for easy comparison
+		lw $t0, target
+		li $t8, 10
+		
+		div $t0, $t8	# _ _ _ _/10
+		mfhi $t3			# d set to remainder
+		mflo $t0			# $t0 set to _ _ _
+		
+		div $t0, $t8	# _ _ _/10
+		mfhi $t2			# c set to remainder
+		mflo $t0			# $t4 set to _ _
+		
+		div $t0, $t8	# _ _/10
+		mfhi $t1			# b set to Least Sig Digit (LSD?)
+		mflo $t0			# a set to Most Sig Digit
+		
+		# dissect guess for easy comparison
+		lw $t4, guess
+		
+		div $t4, $t8	# _ _ _ _/10
+		mfhi $t7			# d set to remainder
+		mflo $t4			# $t0 set to _ _ _
+		
+		div $t4, $t8	# _ _ _/10
+		mfhi $t6			# c set to remainder
+		mflo $t4			# $t4 set to _ _
+		
+		div $t4, $t8	# _ _/10
+		mfhi $t5			# b set to Least Sig Digit (LSD?)
+		mflo $t4			# a set to Most Sig Digit
+		
+		move $t8, $zero		# in-place digits
+		move $t9, $zero		# out-of-place digits
+		
+		# compare Ta with Ga, Gb, Gc, Gd
+		compare_a:
+		beq $t0, $t4, in_place_a
+		beq $t0, $t5, misplaced_a
+		beq $t0, $t6, misplaced_a
+		beq $t0, $t7, misplaced_a
+		j compare_b
+		
+		in_place_a:
+			addi $t8, $t8, 1
+			j compare_b
+			
+		misplaced_a:
+			addi $t9, $t9, 1
+			j compare_b
+			
+		compare_b:
+		beq $t1, $t4, misplaced_b
+		beq $t1, $t5, in_place_b
+		beq $t1, $t6, misplaced_b
+		beq $t1, $t7, misplaced_b
+		j compare_c
+		
+		in_place_b:
+			addi $t8, $t8, 1
+			j compare_c
+			
+		misplaced_b:
+			addi $t9, $t9, 1
+			j compare_c
+			
+		compare_c:
+		beq $t2, $t4, misplaced_c
+		beq $t2, $t5, misplaced_c
+		beq $t2, $t6, in_place_c
+		beq $t2, $t7, misplaced_c
+		j compare_d
+		
+		in_place_c:
+			addi $t8, $t8, 1
+			j compare_d
+			
+		misplaced_c:
+			addi $t9, $t9, 1
+			j compare_d
+		
+		compare_d:
+		beq $t3, $t4, misplaced_d
+		beq $t3, $t5, misplaced_d
+		beq $t3, $t6, misplaced_d
+		beq $t3, $t7, in_place_d
+		j display_score
+		
+		in_place_d:
+			addi $t8, $t8, 1
+			j display_score
+			
+		misplaced_d:
+			addi $t9, $t9, 1
+			j display_score
+			
+		display_score:
+		# calculate the actual score
+		mul $t8, $t8, 10
+		add $t8, $t8, $t9
+		
+		# print score
+		li $v0, 4
+		la $a0, score_intro
+		syscall
+		
+		# if score < 10, print '0'
+		slti $t0, $t8, 10
+		beq $t0, $zero, skip_extra_zero
+		
+		li $v0, 11
+		li $a0, 48 	# ascii 0
+		syscall
+		
+		skip_extra_zero:
+		li $v0, 1
+		move $a0, $t8
+		syscall
+		
+		li $v0, 4
+		la $a0, newline
+		syscall
+		
+		# if score isn't 40, guessing_loop
+		li $t0, 40
+		bne $t0, $t8, guessing_loop
+		# display 'you win' message
+		li $v0, 4
+		la $a0, you_win
+		syscall
+		# take in whether user wants to play again [1 for yes, 0 for no]
+		li $v0, 5
+		syscall
+		beq $v0, $zero, end
+		j guesser
+		
 		
 # ----------------------
 # TARGET LIST GENERATION
@@ -428,7 +578,7 @@ loop_list_a:
 # ----
 	
 	end:
-		# Tell system this is end of main function
+		# Tell system this is end of program
 		li $v0, 10
 		syscall
 		
