@@ -13,7 +13,7 @@
 
 	targets:			.space	20160 # 5040 numbers * 4 bytes/number = 20160
 	
-	you_win:	.asciiz "Congratulations you smartie pants, you win!\nWant to play again??? [enter 1]\nIf not that's okay :'( [enter 0]\n"
+	you_win:	.asciiz "Congratulations you smartie pants, you win!\nWant to play again???? [enter 1]\nIf not that's okay :'( [enter 0]\n"
 		
 	wrong_digits_err: .asciiz 	"\nYour input needs to be four digits long\n"
 	duplicates_err: 	.asciiz 	"\nYour number needs to consist of four unique digits\n"
@@ -58,9 +58,9 @@
 
 	guesser:
 		# Print that we're in the guesser function
-		li $v0, 4
-		la $a0, guesser_method
-		syscall
+		#li $v0, 4
+		#la $a0, guesser_method
+		#syscall
 		
 		# jal loop_through_list
 		jal choose_target
@@ -70,18 +70,14 @@
 		jal score_user_guess
 		
 		# Print that we're in the guesser function
-		li $v0, 4
-		la $a0, guesser_method
-		syscall
+		#li $v0, 4
+		#la $a0, guesser_method
+		#syscall
 		
 		# end
 		j end
 		
 	choose_target:
-		# read integer
-		li $v0, 5
-		syscall # $v0 contains integer read
-		
 		# choose a random number between 0 and 5039
 		li $v0, 42
 		li $a0, 40 # id of pseudorandom number generator (any int)
@@ -137,21 +133,6 @@
 		# assign guess to $v0's contents
 		sw $v0, guess
 		move $v0, $t4
-		
-		# Print intro to guess confirmation
-		li $v0, 4
-		la $a0, guess_confirmation
-		syscall
-		
-		# Print guess
-		li $v0, 1
-		lw $a0, guess
-		syscall
-		
-		# Print new line
-		li $v0, 4
-		la $a0, newline
-		syscall
 		
 		j assess_guess_validity
 		
