@@ -6,6 +6,7 @@
 	role: 				.word 	0 	# 1 for game master, 2 for guesser
 	guess:				.word		0		# This will be the guess
 	score:				.word		0		# This will be the score
+	target:				.word		0		# Program's secret number
 
 	targets:			.space	20160 # 5040 numbers * 4 bytes/number = 20160
 		
@@ -23,6 +24,7 @@
 	end_method: .asciiz "You've arrived to end!\n"
 	number_combos: .asciiz "Total number of combos: "
 	guess_confirmation: .asciiz "\nYou guessed: "
+	target_message: .asciiz "\nI chose target: "
 	colon:	.asciiz	": "
 	newline: .asciiz "\n"
 	
@@ -39,21 +41,8 @@
 		la $a0, challenger_method
 		syscall
 		
-		# call generate_targets
-		jal generate_targets
-		
-		# Print that we're in the challenger function
-		li $v0, 4
-		la $a0, challenger_post_generate
-		syscall
-		
 		# loop through list
-		jal loop_through_list
-		
-		# Print that we're in the challenger function
-		li $v0, 4
-		la $a0, challenger_post_loop
-		syscall
+		# jal loop_through_list (and remove number(s))
 		
 		# end
 		j end
@@ -68,9 +57,9 @@
 		la $a0, guesser_method
 		syscall
 		
-		jal generate_targets
+		# jal loop_through_list
 		
-		jal loop_through_list
+		jal choose_target
 		
 		jal take_in_guess
 		
@@ -81,6 +70,39 @@
 		
 		# end
 		j end
+		
+	choose_target:
+		# choose a random number between 0 and 5039
+		li $v0, 41
+		syscall
+		
+		move $t1, $a0 		# $t1 contains random number
+		li $t2, 5040
+		div $t1, $t2			# $t1 % 5040 - $t1 will be 0-5039
+		mfhi $t1
+		mul $t1, $t1, 4 	# $t1 *= 4
+		
+		# Get address of list
+		la $t0, targets
+	
+		# get memory address: $t0 + ($t1 * 4)
+		add $t1, $t1, $t0		# $t1 now has mem addr to check
+		
+		lw $t2, ($t1) # $t2 should have the value we're looking at
+		sw $t2, target
+		
+		li $v0, 4
+		la $a0, target_message
+		syscall
+		
+		li $v0, 1
+		lw $a0, target
+		syscall
+		
+		li $v0, 4
+		la $a0, newline
+		syscall
+		jr $ra
 		
 	take_in_guess:
 		# take in a 4 (or maybe sometimes 3) digit number from the user
@@ -119,9 +141,9 @@
 		la $a0, newline
 		syscall
 		
-		j assess_guess
+		j assess_guess_validity
 		
-	assess_guess:
+	assess_guess_validity:
 		# if guess < 123, display message and jump to take_in_guess
 		# if guess > 9876, display message and jump to take_in_guess
 		# if guess has duplicates, jump to bad_guess_duplicates
@@ -157,7 +179,6 @@
 		
 		jr $ra
 		
-		
 	bad_guess_digits:
 		# display error message and jump to take_in_guess
 		li $v0, 4
@@ -172,9 +193,9 @@
 		syscall
 		j take_in_guess
 		
-# --------------
-# TARGET GENERATION
-# --------------
+# ----------------------
+# TARGET LIST GENERATION
+# ----------------------
 
 	generate_targets:
 		# $t0 is a, $t1 is b, $t2 is c, $t3 is d
@@ -412,6 +433,9 @@ loop_list_a:
 		syscall
 		
 	main:
+		# Generate a list of targets:
+		jal generate_targets
+		
 		# Print role prompt
 		li $v0, 4
 		la $a0, role_prompt
