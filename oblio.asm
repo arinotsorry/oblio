@@ -9,10 +9,10 @@
 
 	targets:			.space	20160 # 5040 numbers * 4 bytes/number = 20160
 		
-	wrong_digits_err: .asciiz 	"Your input needs to be four digits long. Please enter another number.\n"
-	duplicates_err: 	.asciiz 	"Your number needs to consist of four unique digits. Please enter another number.\n"
-	invalid_clue_err: .asciiz 	"Bruh. Your clue isn't possible, amigo.\n"
-	role_err:					.asciiz		"Babe sweetheart that wasn't one of the options boo\n"
+	wrong_digits_err: .asciiz 	"\nYour input needs to be four digits long\n"
+	duplicates_err: 	.asciiz 	"\nYour number needs to consist of four unique digits\n"
+	invalid_clue_err: .asciiz 	"\nBruh. Your clue isn't possible, amigo.\n"
+	role_err:					.asciiz		"\nBabe sweetheart that wasn't one of the options boo\n"
 	
 	# print debugging:
 	challenger_method: .asciiz	"You've arrived to challenger!\n"
@@ -74,6 +74,11 @@
 		
 		jal take_in_guess
 		
+		# Print that we're in the guesser function
+		li $v0, 4
+		la $a0, guesser_method
+		syscall
+		
 		# end
 		j end
 		
@@ -97,18 +102,75 @@
 		
 		# assign guess to $v0's contents
 		sw $v0, guess
-		move $t0, $v0
+		move $v0, $t4
 		
-		# Print what we just guessed
+		# Print intro to guess confirmation
 		li $v0, 4
 		la $a0, guess_confirmation
 		syscall
 		
+		# Print guess
 		li $v0, 1
 		lw $a0, guess
 		syscall
 		
+		# Print new line
+		li $v0, 4
+		la $a0, newline
+		syscall
+		
+		j assess_guess
+		
+	assess_guess:
+		# if guess < 123, display message and jump to take_in_guess
+		# if guess > 9876, display message and jump to take_in_guess
+		# if guess has duplicates, jump to bad_guess_duplicates
+		lw $t4, guess
+		
+		slti $t0, $t4, 123 # if error, 1
+		bne $t0, $zero, bad_guess_digits
+		
+		sgt $t0, $t4, 9876 # if error, 1
+		bne $t0, $zero, bad_guess_digits
+		
+		# set all the digits to individual registers to make comparison easier
+		li $t5, 10
+		
+		div $t4, $t5	# _ _ _ _/10
+		mfhi $t3			# d set to remainder
+		mflo $t4			# $t4 set to _ _ _
+		
+		div $t4, $t5	# _ _ _/10
+		mfhi $t2			# c set to remainder
+		mflo $t4			# $t4 set to _ _
+		
+		div $t4, $t5	# _ _/10
+		mfhi $t1			# b set to Least Sig Digit (LSD?)
+		mflo $t0			# a set to Most Sig Digit
+		
+		beq $t0, $t1, bad_guess_duplicates
+		beq $t0, $t2, bad_guess_duplicates
+		beq $t0, $t3, bad_guess_duplicates
+		beq $t1, $t2, bad_guess_duplicates
+		beq $t1, $t3, bad_guess_duplicates
+		beq $t2, $t3, bad_guess_duplicates
+		
 		jr $ra
+		
+		
+	bad_guess_digits:
+		# display error message and jump to take_in_guess
+		li $v0, 4
+		la $a0, wrong_digits_err
+		syscall
+		j take_in_guess
+	
+	bad_guess_duplicates:
+		# display error message and jump to take_in_guess
+		li $v0, 4
+		la $a0, duplicates_err
+		syscall
+		j take_in_guess
 		
 # --------------
 # TARGET GENERATION
